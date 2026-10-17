@@ -1,0 +1,89 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><title>Trading Desk · Paper-Trading</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#0b0f14;--card:#121a23;--line:#1f2b38;--txt:#d6e2ee;--mut:#7f93a8;--g:#22c55e;--r:#ef4444;--a:#38bdf8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid var(--line)}
+h1{font-size:18px;margin:0;letter-spacing:.5px}h1 span{color:var(--a)}
+.badge{padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#1e293b}
+.badge.paper{background:#422006;color:#fbbf24}.badge.on{background:#052e16;color:var(--g)}.badge.off{background:#450a0a;color:var(--r)}
+main{padding:16px;display:grid;gap:14px}
+.paper{background:#422006;color:#fbbf24;text-align:center;font-weight:700;padding:8px;font-size:14px;position:sticky;top:0;z-index:5}
+.card{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{min-width:640px}
+@media(max-width:600px){header{padding:12px 14px;flex-wrap:wrap;gap:6px}h1{font-size:16px}
+ .kpis{grid-template-columns:repeat(2,1fr);gap:8px}.v{font-size:17px}.k{font-size:10px}
+ th,td{padding:6px 5px;font-size:12px}main{padding:10px}}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.k{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.6px}.v{font-size:22px;font-weight:700;margin-top:4px;overflow-wrap:anywhere}
+.best{background:#3b2f05;color:#fbbf24;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:700;margin-left:6px}
+.act{background:#082f49;color:var(--a);padding:2px 7px;border-radius:99px;font-size:11px;font-weight:700;margin-left:6px}
+.elim td{opacity:.38}.elim td:first-child,.elim td:nth-child(2){opacity:.55}
+.tagx{background:#3f1d1d;color:#fca5a5;padding:2px 7px;border-radius:99px;font-size:11px;margin-left:6px}
+.pos{color:var(--g)}.neg{color:var(--r)}table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:500}
+h2{font-size:14px;margin:0 0 10px;color:var(--a)}.mut{color:var(--mut)}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.two{grid-template-columns:1fr}}
+</style></head><body>
+<div class="paper">📄 Paper-Trading · kein echtes Geld</div>
+<header><h1>TRADING <span>DESK</span></h1><div><span id="mode" class="badge paper">PAPER · DRY-RUN</span> <span id="state" class="badge">…</span></div></header>
+<main>
+<div class="mut" id="stand" style="font-size:13px"></div>
+<div class="kpis" id="kpis"></div>
+<div class="card"><h2>Offene Trades</h2><div id="open"></div></div>
+<div class="two"><div class="card"><h2>Geschlossene Trades</h2><div id="closed"></div></div>
+<div class="card"><h2>Letzte Signale (Bot-Log)</h2><div id="sig"></div></div></div>
+<div class="card"><h2>Strategie-Ranking (Backtests, 50 USDT Start)</h2>
+<div class="mut" style="margin-bottom:8px">Filter: 30d-Profit ≤ 0 → ausgeschieden (grau, unten). BESTE = höchster Profit mit Profit &gt; 0, Max-Drawdown &lt; 40 % und ≥ 10 Trades (pro Zeitfenster). Backtest ≠ Zukunft.</div><div id="rank"></div></div>
+<div class="card"><h2>Forward-Wettbewerb Paper-Trading <span id="compmeta" class="mut"></span></h2><div id="comp"></div></div>
+<div class="mut" id="foot"></div>
+</main>
+<script>
+const f=(x,d=2)=>x==null||isNaN(x)?'–':Number(x).toFixed(d);
+const cls=x=>x>0?'pos':x<0?'neg':'';
+const t=s=>{if(!s)return '–';let x=String(s).replace(' ','T');if(!/Z|[+-]\d\d:?\d\d$/.test(x))x+='Z';const d=new Date(x);return isNaN(d)?String(s).slice(0,16):d.toLocaleString('de-AT',{timeZone:'Europe/Vienna',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})};
+async function load(){
+ let s;try{s=await (await fetch('data/dashboard.json?'+Date.now(),{cache:'no-store'})).json()}catch(e){document.getElementById('foot').textContent='Daten noch nicht verfügbar';return}
+ const c=s.config||{},b=s.balance||{},p=s.profit||{};s.ping=s.bot_online;
+ const st=document.getElementById('state');st.textContent=s.ping?(c.state||'running').toUpperCase():'BOT OFFLINE';st.className='badge '+(s.ping?'on':'off');
+ document.getElementById('mode').textContent=(c.dry_run===false?'LIVE':'PAPER · DRY-RUN')+' · '+(c.exchange||'?').toUpperCase()+' '+(c.trading_mode||'');
+ const wr=p.winrate!=null?p.winrate*100:null;
+ const k=[['Dry-Run Balance',f(b.total)+' '+(b.stake||'USDT')],['Profit gesamt',`<span class="${cls(p.profit_all_coin)}">${f(p.profit_all_coin)} USDT (${f(p.profit_all_percent)}%)</span>`],
+ ['Profit geschlossen',`<span class="${cls(p.profit_closed_coin)}">${f(p.profit_closed_coin)} USDT</span>`],['Win-Rate',wr==null?'–':f(wr,1)+' %'],
+ ['Trades',(p.trade_count??'–')+` <span class="mut" style="font-size:13px">(${p.closed_trade_count??0} zu)</span>`],['Wins / Losses',(p.winning_trades??'–')+' / '+(p.losing_trades??'–')],
+ ['Max Drawdown',p.max_drawdown!=null?f(p.max_drawdown*100)+' %':'–'],['Aktive Strategie (Haupt-Bot)',`<span style="font-size:14px">${c.strategy||'–'} · ${c.timeframe||''}</span>`]];
+ document.getElementById('kpis').innerHTML=k.map(([a,v])=>`<div class="card"><div class="k">${a}</div><div class="v">${v}</div></div>`).join('');
+ const o=s.open_trades||[];
+ document.getElementById('open').innerHTML=o.length?`<table><tr><th>Pair</th><th>Seite</th><th>Hebel</th><th>Einstieg</th><th>Aktuell</th><th>Stake</th><th>P/L</th><th>Seit</th></tr>${o.map(x=>`<tr><td>${x.pair}</td><td>${x.is_short?'SHORT':'LONG'}</td><td>${f(x.leverage,1)}x</td><td>${x.open_rate}</td><td>${x.current_rate??'–'}</td><td>${f(x.stake_amount)}</td><td class="${cls(x.profit_abs)}">${f(x.profit_abs)} (${f(x.profit_pct)}%)</td><td>${t(x.open_date)}</td></tr>`).join('')}</table>`:'<span class="mut">Keine offenen Trades</span>';
+ const cl=((s.trades||{}).trades||[]).filter(x=>!x.is_open).reverse().slice(0,15);
+ document.getElementById('closed').innerHTML=cl.length?`<table><tr><th>Pair</th><th>Seite</th><th>P/L</th><th>Grund</th><th>Zu</th></tr>${cl.map(x=>`<tr><td>${x.pair}</td><td>${x.is_short?'SHORT':'LONG'}</td><td class="${cls(x.profit_abs)}">${f(x.profit_abs)} (${f(x.profit_pct)}%)</td><td>${x.exit_reason||''}</td><td>${t(x.close_date)}</td></tr>`).join('')}</table>`:'<span class="mut">Noch keine geschlossenen Trades</span>';
+ const sg=(s.signals||[]).slice().reverse();
+ document.getElementById('sig').innerHTML=sg.length?`<table>${sg.map(x=>`<tr><td class="mut" style="white-space:nowrap">${t(x.time)}</td><td>${x.msg.replace(/</g,'&lt;')}</td></tr>`).join('')}</table>`:'<span class="mut">Noch keine Signale im Log</span>';
+ rank(s,c);comp(s);
+ document.getElementById('stand').textContent='Stand: '+new Date(s.updated).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' (Wien)';
+ document.getElementById('foot').textContent='Stand: '+new Date(s.updated).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' (Wien) · Paper-Trading, kein echtes Geld · Daten: Freqtrade Dry-Run (OKX-Preise), aktualisiert alle ~5 Min'+(s.errors&&s.errors.length?' · Fehler: '+s.errors.join('; '):'');
+}
+function rank(s,c){
+ const lb=s.leaderboard||[];if(!lb.length){document.getElementById('rank').innerHTML='<span class="mut">Noch keine Backtests</span>';return}
+ const wins=[...new Set(lb.map(r=>r.window))].sort((a,b)=>parseInt(b)-parseInt(a));let h='';
+ for(const w of wins){
+  const fbv=r=>r.final_balance??(50+r.profit_usdt);
+  const rows=lb.filter(r=>r.window===w).sort((a,b)=>((a.status==='eliminated')-(b.status==='eliminated'))||(fbv(b)-fbv(a)));
+  const ok=rows.filter(r=>r.status!=='eliminated'&&r.profit_pct>0&&r.max_dd_pct<40&&r.trades>=10);const best=ok.length?ok.sort((a,b)=>b.profit_pct-a.profit_pct)[0]:null;
+  h+=`<div class="k" style="margin:10px 0 6px">${w} · ${t(rows[0].start)} → ${t(rows[0].end)} (Wien)</div><table><tr><th>#</th><th>Strategie</th><th>Stil</th><th>TF</th><th>Endbalance</th><th>Profit</th><th>Trades</th><th>Win-Rate</th><th>Max DD</th><th>PF</th><th>Liq.</th><th>Autor</th></tr>`+
+  rows.map((r,i)=>`<tr class="${r.status==='eliminated'?'elim':''}"><td>${i+1}</td><td>${r.strategy}${r.status==='eliminated'?'<span class="tagx">ausgeschieden</span>':''}${best&&r===best?'<span class="best">👑 BESTE</span>':''}${r.strategy===c.strategy?'<span class="act">AKTIV</span>':''}</td><td>${r.style||''}</td><td>${r.timeframe||''}</td><td>${r.final_balance??'–'}</td><td class="${cls(r.profit_pct)}">${r.profit_pct>0?'+':''}${r.profit_pct}% (${r.profit_usdt>0?'+':''}${r.profit_usdt})</td><td>${r.trades}</td><td>${r.winrate??'–'}%</td><td class="neg">${r.max_dd_pct}%</td><td>${r.profit_factor}</td><td>${r.liquidations??'–'}</td><td class="mut">${r.author||''}</td></tr>`).join('')+'</table>';
+  if(!best)h+='<div class="mut" style="margin-top:4px">Keine Strategie erfüllt in diesem Fenster die BESTE-Kriterien.</div>';
+ }
+ document.getElementById('rank').innerHTML=h;
+}
+function comp(s){
+ const c=s.competition||{},m=c.meta||{},bots=(c.bots||[]).slice();
+ document.getElementById('compmeta').textContent=m.start?`· ${m.start} → ${m.end} · Start je Bot ${m.start_balance_usdt} USDT`:'';
+ if(!bots.length){document.getElementById('comp').innerHTML='<span class="mut">Keine Bots registriert</span>';return}
+ bots.sort((a,b)=>((a.enabled===false)-(b.enabled===false))||((b.equity??-1e9)-(a.equity??-1e9)));const lead=bots.find(b=>b.enabled!==false&&b.online&&b.equity!=null&&b.trades>0);
+ document.getElementById('comp').innerHTML=`<table><tr><th>#</th><th>Bot</th><th>Stil</th><th>Equity (inkl. offen)</th><th>vs Start</th><th>Trades</th><th>Offen</th><th>Win-Rate</th><th>Status</th></tr>`+
+ bots.map((b,i)=>{const d=b.equity!=null?b.equity-b.start_balance:null;const off=b.enabled===false;return `<tr class="${off?'elim':''}"><td>${i+1}</td><td>${b.name}${off?'<span class="tagx">ausgeschieden</span>':''}${lead&&b===lead?'<span class="best">👑 FÜHRT</span>':''}</td><td>${b.style||''}</td><td>${b.equity!=null?f(b.equity,3):'–'} USDT</td><td class="${cls(d)}">${d==null?'–':(d>0?'+':'')+f(d,3)+' ('+(d>0?'+':'')+f(d/b.start_balance*100,2)+'%)'}</td><td>${b.trades??'–'}</td><td>${b.open_trades??'–'}</td><td>${b.winrate!=null&&b.closed?f(b.winrate*100,1)+'%':'–'}</td><td class="${off?'mut':(b.online?'pos':'neg')}">${off?'gestoppt':(b.online?'online':'offline')}</td></tr>`}).join('')+'</table>'+(lead?'':'<div class="mut" style="margin-top:4px">Noch kein Führender (noch keine Trades).</div>');
+}
+load();setInterval(load,60000);
+</script></body></html>
