@@ -25,18 +25,23 @@ table{min-width:640px}
 th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:500}
 h2{font-size:14px;margin:0 0 10px;color:var(--a)}.mut{color:var(--mut)}.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:900px){.two{grid-template-columns:1fr}}
+.eq{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.eqc{background:#0e151d;border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.eqc svg{width:100%;height:56px;display:block;margin-top:4px}.eqn{font-size:12px;font-weight:600;overflow-wrap:anywhere}
+.luck{background:#3f1d1d;color:#fca5a5;padding:1px 6px;border-radius:99px;font-size:10px;margin-left:4px;white-space:nowrap}
 </style></head><body>
 <div class="paper">📄 Paper-Trading · kein echtes Geld</div>
 <header><h1>TRADING <span>DESK</span></h1><div><span id="mode" class="badge paper">PAPER · DRY-RUN</span> <span id="state" class="badge">…</span></div></header>
 <main>
 <div class="mut" id="stand" style="font-size:13px"></div>
 <div class="kpis" id="kpis"></div>
+<div class="card"><h2>Forward-Wettbewerb Paper-Trading <span id="compmeta" class="mut"></span></h2><div id="comp"></div></div>
+<div class="card"><h2>Equity-Verlauf je Bot</h2><div class="mut" style="margin-bottom:8px;font-size:12px">Quelle: API jedes Bots (Start + Profit inkl. offener Trades), 1 Punkt / 5 Min seit Bot-Start. Gestrichelt = 50 USDT Start.</div><div id="eq"></div></div>
 <div class="card"><h2>Offene Trades</h2><div id="open"></div></div>
 <div class="two"><div class="card"><h2>Geschlossene Trades</h2><div id="closed"></div></div>
 <div class="card"><h2>Letzte Signale (Bot-Log)</h2><div id="sig"></div></div></div>
 <div class="card"><h2>Strategie-Ranking (Backtests, 50 USDT Start)</h2>
 <div class="mut" style="margin-bottom:8px">Filter: 30d-Profit ≤ 0 → ausgeschieden (grau, unten). BESTE = höchster Profit mit Profit &gt; 0, Max-Drawdown &lt; 40 % und ≥ 10 Trades (pro Zeitfenster). Backtest ≠ Zukunft.</div><div id="rank"></div></div>
-<div class="card"><h2>Forward-Wettbewerb Paper-Trading <span id="compmeta" class="mut"></span></h2><div id="comp"></div></div>
 <div class="mut" id="foot"></div>
 </main>
 <script>
@@ -60,9 +65,27 @@ async function load(){
  document.getElementById('closed').innerHTML=cl.length?`<table><tr><th>Pair</th><th>Seite</th><th>P/L</th><th>Grund</th><th>Zu</th></tr>${cl.map(x=>`<tr><td>${x.pair}</td><td>${x.is_short?'SHORT':'LONG'}</td><td class="${cls(x.profit_abs)}">${f(x.profit_abs)} (${f(x.profit_pct)}%)</td><td>${x.exit_reason||''}</td><td>${t(x.close_date)}</td></tr>`).join('')}</table>`:'<span class="mut">Noch keine geschlossenen Trades</span>';
  const sg=(s.signals||[]).slice().reverse();
  document.getElementById('sig').innerHTML=sg.length?`<table>${sg.map(x=>`<tr><td class="mut" style="white-space:nowrap">${t(x.time)}</td><td>${x.msg.replace(/</g,'&lt;')}</td></tr>`).join('')}</table>`:'<span class="mut">Noch keine Signale im Log</span>';
- rank(s,c);comp(s);
+ rank(s,c);comp(s);eqc(s);
  document.getElementById('stand').textContent='Stand: '+new Date(s.updated).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' (Wien)';
  document.getElementById('foot').textContent='Stand: '+new Date(s.updated).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' (Wien) · Paper-Trading, kein echtes Geld · Daten: Freqtrade Dry-Run (OKX-Preise), aktualisiert alle ~5 Min'+(s.errors&&s.errors.length?' · Fehler: '+s.errors.join('; '):'');
+}
+function nbc(s,w,r){const nb=s.nobest||{};const v=nb.window===w?(nb.values||{})[r.strategy]:undefined;
+ if(v==null)return '<td class="mut">–</td>';const flip=r.profit_usdt>0&&v<0;
+ return `<td class="${cls(v)}">${v>0?'+':''}${f(v,2)}${flip?'<span class="luck" title="Ohne besten Trade im Minus → Ergebnis hängt an EINEM Trade">⚠️ Glück</span>':''}</td>`}
+function eqc(s){
+ const c=s.competition||{},h=c.history||{},bots=(c.bots||[]).filter(b=>b.enabled!==false&&(h[b.name]||[]).length);
+ const el=document.getElementById('eq');if(!bots.length){el.innerHTML='<span class="mut">Noch keine Equity-Daten</span>';return}
+ const ts=x=>{let y=String(x);if(!/Z|[+-]\d\d:?\d\d$/.test(y))y+='Z';return new Date(y).getTime()};
+ bots.sort((a,b)=>(b.equity??-1e9)-(a.equity??-1e9));
+ el.innerHTML='<div class="eq">'+bots.map(b=>{const pts=h[b.name].map(p=>[ts(p[0]),+p[1]]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));if(!pts.length)return '';
+  const sb=b.start_balance??50,W=160,H=56,x0=pts[0][0],x1=Math.max(pts[pts.length-1][0],x0+1);
+  let lo=Math.min(sb,...pts.map(p=>p[1])),hi=Math.max(sb,...pts.map(p=>p[1]));if(hi-lo<0.5){lo-=0.25;hi+=0.25}
+  const X=t=>((t-x0)/(x1-x0)*W).toFixed(1),Y=v=>(H-2-(v-lo)/(hi-lo)*(H-4)).toFixed(1);
+  const last=pts[pts.length-1][1],d=last-sb,col=d>0?'var(--g)':d<0?'var(--r)':'var(--mut)';
+  const line=pts.length>1?`<polyline fill="none" stroke="${col}" stroke-width="1.6" points="${pts.map(p=>X(p[0])+','+Y(p[1])).join(' ')}"/>`:`<circle cx="${W/2}" cy="${Y(last)}" r="2.5" fill="${col}"/>`;
+  return `<div class="eqc"><div class="eqn">${b.name}</div><div style="font-size:12px"><b>${f(last,2)}</b> USDT <span class="${cls(d)}">${d>0?'+':''}${f(d,2)} (${d>0?'+':''}${f(d/sb*100,1)}%)</span></div>
+  <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${Y(sb)}" y2="${Y(sb)}" stroke="#7f93a8" stroke-dasharray="3 3" stroke-width="1"/>${line}</svg>
+  <div class="mut" style="font-size:10px">${t(h[b.name][0][0])} → ${t(h[b.name][h[b.name].length-1][0])} · ${pts.length} Pkt.</div></div>`}).join('')+'</div>';
 }
 function rank(s,c){
  const lb=s.leaderboard||[];if(!lb.length){document.getElementById('rank').innerHTML='<span class="mut">Noch keine Backtests</span>';return}
@@ -71,8 +94,8 @@ function rank(s,c){
   const fbv=r=>r.final_balance??(50+r.profit_usdt);
   const rows=lb.filter(r=>r.window===w).sort((a,b)=>((a.status==='eliminated')-(b.status==='eliminated'))||(fbv(b)-fbv(a)));
   const ok=rows.filter(r=>r.status!=='eliminated'&&r.profit_pct>0&&r.max_dd_pct<40&&r.trades>=10);const best=ok.length?ok.sort((a,b)=>b.profit_pct-a.profit_pct)[0]:null;
-  h+=`<div class="k" style="margin:10px 0 6px">${w} · ${t(rows[0].start)} → ${t(rows[0].end)} (Wien)</div><table><tr><th>#</th><th>Strategie</th><th>Stil</th><th>TF</th><th>Endbalance</th><th>Profit</th><th>Trades</th><th>Win-Rate</th><th>Max DD</th><th>PF</th><th>Liq.</th><th>Autor</th></tr>`+
-  rows.map((r,i)=>`<tr class="${r.status==='eliminated'?'elim':''}"><td>${i+1}</td><td>${r.strategy}${r.status==='eliminated'?'<span class="tagx">ausgeschieden</span>':''}${best&&r===best?'<span class="best">👑 BESTE</span>':''}${r.strategy===c.strategy?'<span class="act">AKTIV</span>':''}</td><td>${r.style||''}</td><td>${r.timeframe||''}</td><td>${r.final_balance??'–'}</td><td class="${cls(r.profit_pct)}">${r.profit_pct>0?'+':''}${r.profit_pct}% (${r.profit_usdt>0?'+':''}${r.profit_usdt})</td><td>${r.trades}</td><td>${r.winrate??'–'}%</td><td class="neg">${r.max_dd_pct}%</td><td>${r.profit_factor}</td><td>${r.liquidations??'–'}</td><td class="mut">${r.author||''}</td></tr>`).join('')+'</table>';
+  h+=`<div class="k" style="margin:10px 0 6px">${w} · ${t(rows[0].start)} → ${t(rows[0].end)} (Wien)</div><table><tr><th>#</th><th>Strategie</th><th>Stil</th><th>TF</th><th>Endbalance</th><th>Profit</th><th>Trades</th><th>Win-Rate</th><th>Max DD</th><th>PF</th><th title="Profit des Backtests ohne den einzelnen besten Trade (report.md)">Ohne besten Trade</th><th>Liq.</th><th>Autor</th></tr>`+
+  rows.map((r,i)=>`<tr class="${r.status==='eliminated'?'elim':''}"><td>${i+1}</td><td>${r.strategy}${r.status==='eliminated'?'<span class="tagx">ausgeschieden</span>':''}${best&&r===best?'<span class="best">👑 BESTE</span>':''}${r.strategy===c.strategy?'<span class="act">AKTIV</span>':''}</td><td>${r.style||''}</td><td>${r.timeframe||''}</td><td>${r.final_balance??'–'}</td><td class="${cls(r.profit_pct)}">${r.profit_pct>0?'+':''}${r.profit_pct}% (${r.profit_usdt>0?'+':''}${r.profit_usdt})</td><td>${r.trades}</td><td>${r.winrate??'–'}%</td><td class="neg">${r.max_dd_pct}%</td><td>${r.profit_factor}</td>${nbc(s,w,r)}<td>${r.liquidations??'–'}</td><td class="mut">${r.author||''}</td></tr>`).join('')+'</table>';
   if(!best)h+='<div class="mut" style="margin-top:4px">Keine Strategie erfüllt in diesem Fenster die BESTE-Kriterien.</div>';
  }
  document.getElementById('rank').innerHTML=h;
