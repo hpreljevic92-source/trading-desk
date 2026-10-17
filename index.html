@@ -29,17 +29,29 @@ h2{font-size:14px;margin:0 0 10px;color:var(--a)}.mut{color:var(--mut)}.two{disp
 .eqc{background:#0e151d;border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
 .eqc svg{width:100%;height:56px;display:block;margin-top:4px}.eqn{font-size:12px;font-weight:600;overflow-wrap:anywhere}
 .luck{background:#3f1d1d;color:#fca5a5;padding:1px 6px;border-radius:99px;font-size:10px;margin-left:4px;white-space:nowrap}
+.mob{display:none}
+@media(max-width:600px){.desk{display:none!important}.mob{display:grid;gap:8px}}
+.bc{background:#0e151d;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.bc .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}.bc .nm{font-weight:700;overflow-wrap:anywhere}
+.bc .row{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px;margin-top:4px}.bc svg{width:100%;height:46px;display:block;margin-top:6px}
+.chip{padding:1px 8px;border-radius:99px;font-size:11px;font-weight:600;white-space:nowrap}.chip.ok{background:#052e16;color:var(--g)}.chip.el{background:#3f1d1d;color:#fca5a5}.chip.of{background:#450a0a;color:var(--r)}
+.leadk{grid-column:1/-1;border-color:#a16207}.leadk .v{font-size:20px}
+details>summary{cursor:pointer;list-style:none}details>summary::-webkit-details-marker{display:none}details>summary:before{content:"▸ ";color:var(--mut)}details[open]>summary:before{content:"▾ "}
+.tog{background:#1e293b;color:var(--a);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;margin-bottom:6px}
 </style></head><body>
 <div class="paper">📄 Paper-Trading · kein echtes Geld</div>
 <header><h1>TRADING <span>DESK</span></h1><div><span id="mode" class="badge paper">PAPER · DRY-RUN</span> <span id="state" class="badge">…</span></div></header>
 <main>
 <div class="mut" id="stand" style="font-size:13px"></div>
-<div class="kpis" id="kpis"></div>
+<div class="kpis" id="ckpis"></div>
 <div class="card"><h2>Forward-Wettbewerb Paper-Trading <span id="compmeta" class="mut"></span></h2><div id="comp"></div></div>
-<div class="card"><h2>Equity-Verlauf je Bot</h2><div class="mut" style="margin-bottom:8px;font-size:12px">Quelle: API jedes Bots (Start + Profit inkl. offener Trades), 1 Punkt / 5 Min seit Bot-Start. Gestrichelt = 50 USDT Start.</div><div id="eq"></div></div>
+<div class="card desk"><h2>Equity-Verlauf je Bot</h2><div class="mut" style="margin-bottom:8px;font-size:12px">Quelle: API jedes Bots (Start + Profit inkl. offener Trades), 1 Punkt / 5 Min seit Bot-Start. Gestrichelt = 50 USDT Start.</div><div id="eq"></div></div>
+<details class="card" id="mainbot"><summary><b style="color:var(--a)">Haupt-Bot (Referenz, nicht im Wettbewerb)</b> <span id="mbtag" class="mut"></span></summary>
+<div style="display:grid;gap:14px;margin-top:10px"><div class="kpis" id="kpis"></div>
 <div class="card"><h2>Offene Trades</h2><div id="open"></div></div>
 <div class="two"><div class="card"><h2>Geschlossene Trades</h2><div id="closed"></div></div>
 <div class="card"><h2>Letzte Signale (Bot-Log)</h2><div id="sig"></div></div></div>
+</div></details>
 <div class="card"><h2>Strategie-Ranking (Backtests, 50 USDT Start)</h2>
 <div class="mut" style="margin-bottom:8px">Filter: 30d-Profit ≤ 0 → ausgeschieden (grau, unten). BESTE = höchster Profit mit Profit &gt; 0, Max-Drawdown &lt; 40 % und ≥ 10 Trades (pro Zeitfenster). Backtest ≠ Zukunft.</div><div id="rank"></div></div>
 <div class="mut" id="foot"></div>
@@ -57,7 +69,7 @@ async function load(){
  const k=[['Dry-Run Balance',f(b.total)+' '+(b.stake||'USDT')],['Profit gesamt',`<span class="${cls(p.profit_all_coin)}">${f(p.profit_all_coin)} USDT (${f(p.profit_all_percent)}%)</span>`],
  ['Profit geschlossen',`<span class="${cls(p.profit_closed_coin)}">${f(p.profit_closed_coin)} USDT</span>`],['Win-Rate',wr==null?'–':f(wr,1)+' %'],
  ['Trades',(p.trade_count??'–')+` <span class="mut" style="font-size:13px">(${p.closed_trade_count??0} zu)</span>`],['Wins / Losses',(p.winning_trades??'–')+' / '+(p.losing_trades??'–')],
- ['Max Drawdown',p.max_drawdown!=null?f(p.max_drawdown*100)+' %':'–'],['Aktive Strategie (Haupt-Bot)',`<span style="font-size:14px">${c.strategy||'–'} · ${c.timeframe||''}</span>`]];
+ ['Max Drawdown',p.max_drawdown!=null?f(p.max_drawdown*100)+' %':'–'],['Strategie (Haupt-Bot, Referenz)',`<span style="font-size:14px">${c.strategy||'–'} · ${c.timeframe||''}</span>`]];
  document.getElementById('kpis').innerHTML=k.map(([a,v])=>`<div class="card"><div class="k">${a}</div><div class="v">${v}</div></div>`).join('');
  const o=s.open_trades||[];
  document.getElementById('open').innerHTML=o.length?`<table><tr><th>Pair</th><th>Seite</th><th>Hebel</th><th>Einstieg</th><th>Aktuell</th><th>Stake</th><th>P/L</th><th>Seit</th></tr>${o.map(x=>`<tr><td>${x.pair}</td><td>${x.is_short?'SHORT':'LONG'}</td><td>${f(x.leverage,1)}x</td><td>${x.open_rate}</td><td>${x.current_rate??'–'}</td><td>${f(x.stake_amount)}</td><td class="${cls(x.profit_abs)}">${f(x.profit_abs)} (${f(x.profit_pct)}%)</td><td>${t(x.open_date)}</td></tr>`).join('')}</table>`:'<span class="mut">Keine offenen Trades</span>';
@@ -65,6 +77,8 @@ async function load(){
  document.getElementById('closed').innerHTML=cl.length?`<table><tr><th>Pair</th><th>Seite</th><th>P/L</th><th>Grund</th><th>Zu</th></tr>${cl.map(x=>`<tr><td>${x.pair}</td><td>${x.is_short?'SHORT':'LONG'}</td><td class="${cls(x.profit_abs)}">${f(x.profit_abs)} (${f(x.profit_pct)}%)</td><td>${x.exit_reason||''}</td><td>${t(x.close_date)}</td></tr>`).join('')}</table>`:'<span class="mut">Noch keine geschlossenen Trades</span>';
  const sg=(s.signals||[]).slice().reverse();
  document.getElementById('sig').innerHTML=sg.length?`<table>${sg.map(x=>`<tr><td class="mut" style="white-space:nowrap">${t(x.time)}</td><td>${x.msg.replace(/</g,'&lt;')}</td></tr>`).join('')}</table>`:'<span class="mut">Noch keine Signale im Log</span>';
+ window.LAST=s;{const el=(s.leaderboard||[]).some(r=>r.strategy===c.strategy&&r.window==='30d'&&r.status==='eliminated');
+ document.getElementById('mbtag').innerHTML=`${c.strategy||'–'} · ${c.timeframe||''}`+(el?' <span class="tagx">im Backtest ausgeschieden</span>':'');}
  rank(s,c);comp(s);eqc(s);
  document.getElementById('stand').textContent='Stand: '+new Date(s.updated).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' (Wien)';
  document.getElementById('foot').textContent='Stand: '+new Date(s.updated).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' (Wien) · Paper-Trading, kein echtes Geld · Daten: Freqtrade Dry-Run (OKX-Preise), aktualisiert alle ~5 Min'+(s.errors&&s.errors.length?' · Fehler: '+s.errors.join('; '):'');
@@ -72,6 +86,12 @@ async function load(){
 function nbc(s,w,r){const nb=s.nobest||{};const v=nb.window===w?(nb.values||{})[r.strategy]:undefined;
  if(v==null)return '<td class="mut">–</td>';const flip=r.profit_usdt>0&&v<0;
  return `<td class="${cls(v)}">${v>0?'+':''}${f(v,2)}${flip?'<span class="luck" title="Ohne besten Trade im Minus → Ergebnis hängt an EINEM Trade">⚠️ Glück</span>':''}</td>`}
+function tms(x){let y=String(x);if(!/Z|[+-]\d\d:?\d\d$/.test(y))y+='Z';return new Date(y).getTime()}
+function spark(raw,sb,W=300,H=46){const pts=(raw||[]).map(p=>[tms(p[0]),+p[1]]).filter(p=>!isNaN(p[0])&&!isNaN(p[1]));if(!pts.length)return '';
+ const x0=pts[0][0],x1=Math.max(pts[pts.length-1][0],x0+1);let lo=Math.min(sb,...pts.map(p=>p[1])),hi=Math.max(sb,...pts.map(p=>p[1]));if(hi-lo<0.5){lo-=0.25;hi+=0.25}
+ const X=t=>((t-x0)/(x1-x0)*W).toFixed(1),Y=v=>(H-2-(v-lo)/(hi-lo)*(H-4)).toFixed(1),d=pts[pts.length-1][1]-sb,col=d>0?'var(--g)':d<0?'var(--r)':'var(--mut)';
+ return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${Y(sb)}" y2="${Y(sb)}" stroke="#7f93a8" stroke-dasharray="3 3" stroke-width="1"/>`+
+  (pts.length>1?`<polyline fill="none" stroke="${col}" stroke-width="1.6" vector-effect="non-scaling-stroke" points="${pts.map(p=>X(p[0])+','+Y(p[1])).join(' ')}"/>`:`<circle cx="${W/2}" cy="${Y(pts[0][1])}" r="2.5" fill="${col}"/>`)+'</svg>'}
 function eqc(s){
  const c=s.competition||{},h=c.history||{},bots=(c.bots||[]).filter(b=>b.enabled!==false&&(h[b.name]||[]).length);
  const el=document.getElementById('eq');if(!bots.length){el.innerHTML='<span class="mut">Noch keine Equity-Daten</span>';return}
@@ -87,12 +107,15 @@ function eqc(s){
   <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${Y(sb)}" y2="${Y(sb)}" stroke="#7f93a8" stroke-dasharray="3 3" stroke-width="1"/>${line}</svg>
   <div class="mut" style="font-size:10px">${t(h[b.name][0][0])} → ${t(h[b.name][h[b.name].length-1][0])} · ${pts.length} Pkt.</div></div>`}).join('')+'</div>';
 }
+let SHOWALL=false;
 function rank(s,c){
  const lb=s.leaderboard||[];if(!lb.length){document.getElementById('rank').innerHTML='<span class="mut">Noch keine Backtests</span>';return}
- const wins=[...new Set(lb.map(r=>r.window))].sort((a,b)=>parseInt(b)-parseInt(a));let h='';
- for(const w of wins){
+ const wins=[...new Set(lb.map(r=>r.window))].sort((a,b)=>parseInt(b)-parseInt(a));let h='';if(!SHOWALL&&!wins.includes('30d'))SHOWALL=true;
+ const nAll=lb.length,nShow=lb.filter(r=>r.window==='30d'&&r.status!=='eliminated').length;
+ h+=`<button class="tog" onclick="SHOWALL=!SHOWALL;rank(LAST,LAST.config||{})">${SHOWALL?'nur 30d-Überlebende':'alle anzeigen ('+nAll+')'}</button> <span class="mut" style="font-size:12px">${SHOWALL?'alle Fenster & ausgeschiedene':'30 Tage · nur Überlebende ('+nShow+')'}</span>`;
+ for(const w of (SHOWALL?wins:wins.filter(x=>x==='30d'))){
   const fbv=r=>r.final_balance??(50+r.profit_usdt);
-  const rows=lb.filter(r=>r.window===w).sort((a,b)=>((a.status==='eliminated')-(b.status==='eliminated'))||(fbv(b)-fbv(a)));
+  const rows=lb.filter(r=>r.window===w&&(SHOWALL||r.status!=='eliminated')).sort((a,b)=>((a.status==='eliminated')-(b.status==='eliminated'))||(fbv(b)-fbv(a)));
   const ok=rows.filter(r=>r.status!=='eliminated'&&r.profit_pct>0&&r.max_dd_pct<40&&r.trades>=10);const best=ok.length?ok.sort((a,b)=>b.profit_pct-a.profit_pct)[0]:null;
   h+=`<div class="k" style="margin:10px 0 6px">${w} · ${t(rows[0].start)} → ${t(rows[0].end)} (Wien)</div><table><tr><th>#</th><th>Strategie</th><th>Stil</th><th>TF</th><th>Endbalance</th><th>Profit</th><th>Trades</th><th>Win-Rate</th><th>Max DD</th><th>PF</th><th title="Profit des Backtests ohne den einzelnen besten Trade (report.md)">Ohne besten Trade</th><th>Liq.</th><th>Autor</th></tr>`+
   rows.map((r,i)=>`<tr class="${r.status==='eliminated'?'elim':''}"><td>${i+1}</td><td>${r.strategy}${r.status==='eliminated'?'<span class="tagx">ausgeschieden</span>':''}${best&&r===best?'<span class="best">👑 BESTE</span>':''}${r.strategy===c.strategy?'<span class="act">AKTIV</span>':''}</td><td>${r.style||''}</td><td>${r.timeframe||''}</td><td>${r.final_balance??'–'}</td><td class="${cls(r.profit_pct)}">${r.profit_pct>0?'+':''}${r.profit_pct}% (${r.profit_usdt>0?'+':''}${r.profit_usdt})</td><td>${r.trades}</td><td>${r.winrate??'–'}%</td><td class="neg">${r.max_dd_pct}%</td><td>${r.profit_factor}</td>${nbc(s,w,r)}<td>${r.liquidations??'–'}</td><td class="mut">${r.author||''}</td></tr>`).join('')+'</table>';
@@ -105,8 +128,23 @@ function comp(s){
  document.getElementById('compmeta').textContent=m.start?`· ${m.start} → ${m.end} · Start je Bot ${m.start_balance_usdt} USDT`:'';
  if(!bots.length){document.getElementById('comp').innerHTML='<span class="mut">Keine Bots registriert</span>';return}
  bots.sort((a,b)=>((a.enabled===false)-(b.enabled===false))||((b.equity??-1e9)-(a.equity??-1e9)));const lead=bots.find(b=>b.enabled!==false&&b.online&&b.equity!=null&&b.trades>0);
- document.getElementById('comp').innerHTML=`<table><tr><th>#</th><th>Bot</th><th>Stil</th><th>Equity (inkl. offen)</th><th>vs Start</th><th>Trades</th><th>Offen</th><th>Win-Rate</th><th>Status</th></tr>`+
+ const TBL=`<table><tr><th>#</th><th>Bot</th><th>Stil</th><th>Equity (inkl. offen)</th><th>vs Start</th><th>Trades</th><th>Offen</th><th>Win-Rate</th><th>Status</th></tr>`+
  bots.map((b,i)=>{const d=b.equity!=null?b.equity-b.start_balance:null;const off=b.enabled===false;return `<tr class="${off?'elim':''}"><td>${i+1}</td><td>${b.name}${off?'<span class="tagx">ausgeschieden</span>':''}${lead&&b===lead?'<span class="best">👑 FÜHRT</span>':''}</td><td>${b.style||''}</td><td>${b.equity!=null?f(b.equity,3):'–'} USDT</td><td class="${cls(d)}">${d==null?'–':(d>0?'+':'')+f(d,3)+' ('+(d>0?'+':'')+f(d/b.start_balance*100,2)+'%)'}</td><td>${b.trades??'–'}</td><td>${b.open_trades??'–'}</td><td>${b.winrate!=null&&b.closed?f(b.winrate*100,1)+'%':'–'}</td><td class="${off?'mut':(b.online?'pos':'neg')}">${off?'gestoppt':(b.online?'online':'offline')}</td></tr>`}).join('')+'</table>'+(lead?'':'<div class="mut" style="margin-top:4px">Noch kein Führender (noch keine Trades).</div>');
+ const H=c.history||{},alive=bots.filter(b=>b.enabled!==false),dead=bots.filter(b=>b.enabled===false);
+ const card=(b,i)=>{const d=b.equity!=null?b.equity-b.start_balance:null;const st=b.online?'<span class="chip ok">Überlebend · online</span>':'<span class="chip of">Überlebend · offline</span>';
+  return `<div class="bc"><div class="top"><span class="nm">#${i+1} ${b.name}${lead&&b===lead?' <span class="best">👑 FÜHRT</span>':''}</span>${st}</div>
+  <div class="row"><span><b>${b.equity!=null?f(b.equity,2):'–'}</b> USDT</span><span class="${cls(d)}">${d==null?'–':(d>0?'+':'')+f(d,2)+' ('+(d>0?'+':'')+f(d/b.start_balance*100,2)+'%)'} vs ${b.start_balance}</span><span class="mut">${b.trades??0} Trades · ${b.open_trades??0} offen</span></div>${spark(H[b.name],b.start_balance)}</div>`};
+ const MOB=`<div class="mob">${alive.map(card).join('')}${dead.length?`<details class="bc"><summary class="mut">Ausgeschieden (${dead.length})</summary><div style="display:grid;gap:4px;margin-top:6px;font-size:13px">${dead.map(b=>`<div style="display:flex;justify-content:space-between;gap:6px"><span class="mut" style="overflow-wrap:anywhere">${b.name}</span><span class="chip el">ausgeschieden</span></div>`).join('')}</div></details>`:''}${lead?'':'<div class="mut">Noch kein Führender (noch keine Trades).</div>'}</div>`;
+ document.getElementById('comp').innerHTML='<div class="desk">'+TBL+'</div>'+MOB;
+ // top KPIs = competition (real values from the bots' APIs)
+ const on=alive.filter(b=>b.equity!=null),last=on.length?on[on.length-1]:null;
+ const day=m.start?Math.floor((Date.now()-new Date(m.start+'T00:00:00').getTime())/864e5)+1:null,tot=m.start&&m.end?Math.round((new Date(m.end)-new Date(m.start))/864e5):null;
+ const dl=b=>{const d=b.equity-b.start_balance;return `<span class="${cls(d)}">${d>0?'+':''}${f(d,2)} USDT (${d>0?'+':''}${f(d/b.start_balance*100,2)}%)</span>`};
+ const k=[[lead?'👑 Führender im Wettbewerb':'Führender',lead?`${lead.name}<div style="font-size:15px;font-weight:600">${f(lead.equity,2)} USDT · ${dl(lead)}</div>`:'<span class="mut" style="font-size:15px">noch keiner (keine Trades)</span>','leadk'],
+  ['Überlebend / Ausgeschieden',`<span class="pos">${alive.length}</span> / <span class="neg">${dead.length}</span>`],
+  ['Wettbewerbstag',day!=null?`${Math.max(1,Math.min(day,tot||day))}${tot?' / '+tot:''}`:'–'],
+  ['Schlusslicht (aktiv)',last?`<span style="font-size:14px">${last.name}</span><div style="font-size:14px">${dl(last)}</div>`:'–']];
+ document.getElementById('ckpis').innerHTML=k.map(([a,v,x])=>`<div class="card ${x||''}"><div class="k">${a}</div><div class="v">${v}</div></div>`).join('');
 }
 load();setInterval(load,60000);
 </script></body></html>
