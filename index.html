@@ -111,14 +111,16 @@ let SHOWALL=false;
 function rank(s,c){
  const lb=s.leaderboard||[];if(!lb.length){document.getElementById('rank').innerHTML='<span class="mut">Noch keine Backtests</span>';return}
  const wins=[...new Set(lb.map(r=>r.window))].sort((a,b)=>parseInt(b)-parseInt(a));let h='';if(!SHOWALL&&!wins.includes('30d'))SHOWALL=true;
- const nAll=lb.length,nShow=lb.filter(r=>r.window==='30d'&&r.status!=='eliminated').length;
+ const nAll=lb.length,nShow=new Set(lb.filter(r=>r.window==='30d'&&r.status!=='eliminated').map(r=>r.strategy)).size;
  h+=`<button class="tog" onclick="SHOWALL=!SHOWALL;rank(LAST,LAST.config||{})">${SHOWALL?'nur 30d-Überlebende':'alle anzeigen ('+nAll+')'}</button> <span class="mut" style="font-size:12px">${SHOWALL?'alle Fenster & ausgeschiedene':'30 Tage · nur Überlebende ('+nShow+')'}</span>`;
- for(const w of (SHOWALL?wins:wins.filter(x=>x==='30d'))){
+ const EXL={okx:'OKX-Daten · Top-15',binance:'Binance-Archiv · Top-20'};const exs=[...new Set(lb.map(r=>r.exchange||'okx'))].sort();
+ for(const w of (SHOWALL?wins:wins.filter(x=>x==='30d')))for(const ex of exs){
   const fbv=r=>r.final_balance??(50+r.profit_usdt);
-  const rows=lb.filter(r=>r.window===w&&(SHOWALL||r.status!=='eliminated')).sort((a,b)=>((a.status==='eliminated')-(b.status==='eliminated'))||(fbv(b)-fbv(a)));
+  const rows=lb.filter(r=>r.window===w&&(r.exchange||'okx')===ex&&(SHOWALL||r.status!=='eliminated')).sort((a,b)=>((a.status==='eliminated')-(b.status==='eliminated'))||(fbv(b)-fbv(a)));
+  if(!rows.length)continue;
   const ok=rows.filter(r=>r.status!=='eliminated'&&r.profit_pct>0&&r.max_dd_pct<40&&r.trades>=10);const best=ok.length?ok.sort((a,b)=>b.profit_pct-a.profit_pct)[0]:null;
-  h+=`<div class="k" style="margin:10px 0 6px">${w} · ${t(rows[0].start)} → ${t(rows[0].end)} (Wien)</div><table><tr><th>#</th><th>Strategie</th><th>Stil</th><th>TF</th><th>Endbalance</th><th>Profit</th><th>Trades</th><th>Win-Rate</th><th>Max DD</th><th>PF</th><th title="Profit des Backtests ohne den einzelnen besten Trade (report.md)">Ohne besten Trade</th><th>Liq.</th><th>Autor</th></tr>`+
-  rows.map((r,i)=>`<tr class="${r.status==='eliminated'?'elim':''}"><td>${i+1}</td><td>${r.strategy}${r.status==='eliminated'?'<span class="tagx">ausgeschieden</span>':''}${best&&r===best?'<span class="best">👑 BESTE</span>':''}${r.strategy===c.strategy?'<span class="act">AKTIV</span>':''}</td><td>${r.style||''}</td><td>${r.timeframe||''}</td><td>${r.final_balance??'–'}</td><td class="${cls(r.profit_pct)}">${r.profit_pct>0?'+':''}${r.profit_pct}% (${r.profit_usdt>0?'+':''}${r.profit_usdt})</td><td>${r.trades}</td><td>${r.winrate??'–'}%</td><td class="neg">${r.max_dd_pct}%</td><td>${r.profit_factor}</td>${nbc(s,w,r)}<td>${r.liquidations??'–'}</td><td class="mut">${r.author||''}</td></tr>`).join('')+'</table>';
+  h+=`<div class="k" style="margin:10px 0 6px">${w} · ${EXL[ex]||ex} · ${t(rows[0].start)} → ${t(rows[0].end)} (Wien)</div><table><tr><th>#</th><th>Strategie</th><th>Stil</th><th>TF</th><th>Endbalance</th><th>Profit</th><th>Trades</th><th>Win-Rate</th><th>Max DD</th><th>PF</th><th title="Profit des Backtests ohne den einzelnen besten Trade (report.md)">Ohne besten Trade</th><th>Liq.</th><th>Autor</th></tr>`+
+  rows.map((r,i)=>`<tr class="${r.status==='eliminated'?'elim':''}"><td>${i+1}</td><td>${r.strategy}${r.status==='eliminated'?'<span class="tagx">ausgeschieden</span>':''}${best&&r===best?'<span class="best">👑 BESTE</span>':''}${r.strategy===c.strategy?'<span class="act">AKTIV</span>':''}</td><td>${r.style||''}</td><td>${r.timeframe||''}</td><td>${r.final_balance??'–'}</td><td class="${cls(r.profit_pct)}">${r.profit_pct>0?'+':''}${r.profit_pct}% (${r.profit_usdt>0?'+':''}${r.profit_usdt})</td><td>${r.trades}</td><td>${r.winrate??'–'}%</td><td class="neg">${r.max_dd_pct}%</td><td>${r.profit_factor}</td>${ex==='okx'?nbc(s,w,r):'<td class="mut">–</td>'}<td>${r.liquidations??'–'}</td><td class="mut">${r.author||''}</td></tr>`).join('')+'</table>';
   if(!best)h+='<div class="mut" style="margin-top:4px">Keine Strategie erfüllt in diesem Fenster die BESTE-Kriterien.</div>';
  }
  document.getElementById('rank').innerHTML=h;
